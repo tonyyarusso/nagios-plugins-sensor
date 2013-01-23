@@ -1,0 +1,22 @@
+Check plugin for system sensors
+Copyright:  2012, Tony Yarusso
+Auther:     Tony Yarusso <tonyyarusso@gmail.com>
+License:    BSD <http://www.opensource.org/licenses/bsd-license.php>
+
+Options:
+    -h | --help
+           Display this help text
+    -V | --version
+           Display the version of this script
+    -s | --sensor <sensor>
+           Set which sensor to query
+    -t | --type <type>
+           Set the sensor type (eg. Temperature or Fan
+    -w | --warning <level>
+           The high sensor reading to trigger a warning state
+    -c | --critical <level>
+           The high sensor reading to trigger a critical state
+    -W | --low-warning <level>
+           The low sensor reading to trigger a warning state
+    -C | --low-critical <level>
+           The low sensor reading to trigger a critical state

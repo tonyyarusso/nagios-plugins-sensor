@@ -1,0 +1,124 @@
+#!/bin/bash
+## Not yet compliant - needs switches and help, etc.
+VERSION="0.1"
+
+usage() {
+	echo "Check plugin for system sensors"
+	echo "Copyright:  2012, Tony Yarusso"
+	echo "Auther:     Tony Yarusso <tonyyarusso@gmail.com>"
+	echo "License:    BSD <http://www.opensource.org/licenses/bsd-license.php>"
+	echo ""
+	echo "Options:"
+	echo "    -h | --help"
+	echo "           Display this help text"
+	echo "    -V | --version"
+	echo "           Display the version of this script"
+	echo "    -s | --sensor <sensor>"
+	echo "           Set which sensor to query"
+	echo "    -t | --type <type>"
+	echo "           Set the sensor type (eg. Temperature or Fan"
+	echo "    -w | --warning <level>"
+	echo "           The high sensor reading to trigger a warning state"
+	echo "    -c | --critical <level>"
+	echo "           The high sensor reading to trigger a critical state"
+	echo "    -W | --low-warning <level>"
+	echo "           The low sensor reading to trigger a warning state"
+	echo "    -C | --low-critical <level>"
+	echo "           The low sensor reading to trigger a critical state"
+}
+
+# Set some defaults so the script still works if not all parameters are supplied
+WARN_THRESHOLD=1000000
+CRIT_THRESHOLD=100000
+LOW_WARN_THRESHOLD=0
+LOW_CRIT_THRESHOLD=0
+
+# Parse parameters
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h | --help)
+			usage
+			exit 0
+			;;
+		-V | --version)
+			echo "Script version $VERSION"
+			exit 0
+			;;
+		-s | --sensor)
+			shift
+			SENSOR="$1"
+			;;
+		-t | --type)
+			shift
+			TYPE="$1"
+			;;
+		-w | --warning)
+			shift
+			WARN_THRESHOLD="$1"
+			;;
+		-c | --critical)
+			shift
+			CRIT_THRESHOLD="$1"
+			;;
+		-W | --low-warning)
+			shift
+			LOW_WARN_THRESHOLD="$1"
+			;;
+		-C | --low-critical)
+			shift
+			LOW_CRIT_THRESHOLD="$1"
+			;;
+		*)
+			echo "Unknown argument: $1"
+			usage
+			exit 1
+			;;
+	esac
+shift
+done
+
+if [ "$SENSOR" = "" ]; then
+	echo "Sensor name must be defined!"
+	usage
+	exit 1
+fi
+
+if [ "$TYPE" = "" ]; then
+	echo "Sensor type must be defined!"
+	usage
+	exit 1
+fi
+
+# Sanitize input
+if [ $(/bin/echo "$WARN_THRESHOLD > $CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 ]; then
+	WARN_THRESHOLD=$CRIT_THRESHOLD
+fi
+if [ $(/bin/echo "$LOW_WARN_THRESHOLD < $LOW_CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 ]; then
+	LOW_WARN_THRESHOLD=$LOW_CRIT_THRESHOLD
+fi
+if [ "$TYPE" = "Temperature" ]; then
+	UNIT="C"
+elif [ "$TYPE" = "Fan" ]; then
+	UNIT=" RPM"
+elif [ "$TYPE" = "Voltage" ]; then
+	UNIT="V"
+else
+	UNIT=""
+fi
+
+SENSOR_OUTPUT=$(/usr/bin/sensors | /bin/grep "$SENSOR")
+READING=$(/bin/echo "$SENSOR_OUTPUT" | /bin/sed 's/[a-zA-Z0-9.+]*\:\ *[+]*\([0-9\.]*\).*/\1/')
+PERFDATA="'"$SENSOR"'=$READING;$WARN_THRESHOLD;$CRIT_THRESHOLD;"
+if [ $(/bin/echo "$READING < $WARN_THRESHOLD" | /usr/bin/bc) -eq 1 -a $(/bin/echo "$READING > $LOW_WARN_THRESHOLD" | /usr/bin/bc) -eq 1 ]; then
+	/bin/echo "$TYPE OK - ""$READING""$UNIT""|$PERFDATA"
+	exit 0
+elif [ $(/bin/echo "$READING < $CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 -a $(/bin/echo "$READING > $LOW_CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 ]; then
+	/bin/echo "$TYPE WARNING - ""$READING""$UNIT""|$PERFDATA"
+	exit 1
+elif [ $(/bin/echo "$READING >= $CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 -o $(/bin/echo "$READING <= $LOW_CRIT_THRESHOLD" | /usr/bin/bc) -eq 1 ]; then
+	/bin/echo "$TYPE CRITICAL - ""$READING""$UNIT""|$PERFDATA"
+	exit 2
+else
+	/bin/echo "$TYPE UNKNOWN - ""$READING""$UNIT""|$PERFDATA"
+	exit 3
+fi
